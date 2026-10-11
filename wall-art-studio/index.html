@@ -1,0 +1,35 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wall Art Studio</title><link rel="stylesheet" href="../assets/common.css">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<style>#view{width:100%;height:420px;border-radius:8px;background:var(--panel2);touch-action:none}@media(max-width:600px){#view{height:300px}}
+#flat{width:100%;height:auto}#layers td{padding:4px 6px;font-size:14px}#layers input{width:70px}.mini{padding:3px 8px;font-size:13px}
+output{font-family:var(--mono);font-size:13px;color:var(--text)}#warn .note{margin:6px 0}</style></head>
+<body><div class="wrap">
+<h1>Wall Art Studio <span class="badge" style="color:var(--warn);border-color:var(--warn)">BETA</span></h1>
+<p class="muted">SVG or picture to flat multi-colour wall art. Each colour is a layer on a base plate. <b>Beta: sizes are not test-printed yet.</b></p>
+<div class="cols">
+<div class="card">
+  <div class="drop" id="drop">Drop an SVG, PNG or JPEG here, or click</div>
+  <label>Colours</label><select id="mode"><option value="auto">Pick for me</option><option value="lib">From my filaments</option></select>
+  <div id="autoBox"><label>Number of colours <output id="kv">4</output></label><input type="range" id="k" min="2" max="8" value="4"></div>
+  <div id="libBox" hidden><div id="lib" class="small"></div></div>
+  <label>Remove specks smaller than <output id="sv">1.0</output> mm²</label><input type="range" id="speck" min="0" max="10" step="0.5" value="1">
+  <label>Width (mm)</label><input type="number" id="wmm" value="150" min="10" max="500">
+  <label>Bed size (mm)</label><input type="number" id="bed" value="256" min="50" max="1000">
+  <label>Detail (pixels per mm)</label><select id="ppm"><option>2</option><option selected>4</option><option>6</option><option>8</option></select>
+  <label>Back</label><select id="back"><option value="plate">Base plate (biggest colour)</option><option value="cut">Cut out (no plate, biggest colour removed)</option></select>
+  <label><input type="checkbox" id="bridges"> Add bridges to floating pieces (cut out only)</label>
+  <label>Bridge width (mm)</label><input type="number" id="bw" value="2" min="0.8" step="0.2">
+  <label><input type="checkbox" id="frame" checked> Frame border</label>
+  <div class="row"><div><label>Frame width</label><input type="number" id="fw" value="6" min="1" step="0.5" style="width:90px"></div><div><label>Frame height</label><input type="number" id="fh" value="4" min="0.4" step="0.2" style="width:90px"></div><div><label>Frame colour</label><select id="fc"></select></div></div>
+  <label>Nozzle (mm)</label><input type="number" id="noz" value="0.4" step="0.05" min="0.1">
+</div>
+<div>
+  <div class="card"><div id="view"></div>
+    <p id="status" class="muted small">Drop a picture to start.</p>
+    <div class="row"><button id="d3mf" disabled>Download 3MF</button><button id="dstl" class="ghost" disabled>Zip: STL per colour</button><button id="save" class="ghost" disabled>Save to Projects</button></div>
+    <p class="small muted">The 3MF has one part per colour, with a colour and extruder for each. Not yet checked in Bambu Studio or Orca: check the parts before you print.</p></div>
+  <div class="card" style="margin-top:16px"><h2 style="margin-top:0">Layers, bottom to top</h2><table id="layers"></table><div id="warn"></div></div>
+  <div class="card" style="margin-top:16px"><div class="row"><b>Flat view</b><label style="margin:0"><input type="checkbox" id="showThin" checked> Show thin parts in red</label></div><canvas id="flat"></canvas></div>
+</div></div></div>
+<script type="module" src="app.js"></script></body></html>

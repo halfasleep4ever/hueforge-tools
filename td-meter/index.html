@@ -1,0 +1,39 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TD Meter</title><link rel="stylesheet" href="../assets/common.css">
+<style>.tabs button{border-radius:8px}.tabs button.on{background:var(--accent);color:#111}#photo{width:100%;touch-action:none;cursor:crosshair;display:block}
+.vals{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}.vals label{margin:0}.vals input{width:100%}
+ol{padding-left:20px}#chart{width:100%;height:auto;background:var(--panel2)}.big{font-size:28px;font-weight:700}</style></head>
+<body><div class="wrap">
+<h1>TD Meter</h1>
+<p class="muted">Print a small step card in your filament. Photograph it against a bright light. Get an estimate of its TD.</p>
+<div class="cols">
+<div>
+<div class="card"><h2 style="margin-top:0">1. Print the step card</h2>
+<label for="lh">Layer height (mm)</label><input id="lh" type="number" step="0.01" min="0.02" max="0.4" value="0.08">
+<label for="fl">First layer (mm)</label><input id="fl" type="number" step="0.01" min="0.02" max="0.4" value="0.08">
+<p class="small muted" id="cardinfo"></p>
+<button id="stl">Download STL</button>
+<ol class="small"><li>Slice with exactly these layer heights. Print in one filament.</li><li>100 % infill, no ironing, no "adaptive layers".</li><li>Print it flat on the plate, smooth side down.</li></ol>
+</div>
+</div>
+<div class="card"><h2 style="margin-top:0">2. Measure</h2>
+<div class="row tabs"><button class="ghost on" data-m="photo">From photo</button><button class="ghost" data-m="manual">Type values</button></div>
+<div id="m-photo">
+<ol class="small"><li>Hold the card flat against a bright window, or a phone screen showing plain white. Fill the frame. No direct sun.</li>
+<li>Take the photo straight on, with no flash.</li><li>Drop it here. Then click the open window, then steps 1 to 8. Or drag one line from the window centre to the step 8 centre.</li></ol>
+<div class="drop" id="drop">Drop the photo here, or click to choose</div>
+<div id="photowrap" hidden><p class="small" id="hint"></p><canvas id="photo"></canvas>
+<div class="row" style="margin-top:8px"><button class="ghost" id="undo">Undo click</button><button class="ghost" id="clear">Start again</button></div></div>
+</div>
+<div id="m-manual" hidden>
+<p class="small muted">Type the brightness of each part, in any unit (for example a light meter, or the value from a photo editor in linear light). Leave a box empty to skip that step.</p>
+<div class="vals" id="vals"></div><button class="ghost" id="calc" style="margin-top:8px">Calculate</button>
+</div>
+<h2>Result</h2>
+<div id="res" class="muted">No measurement yet.</div>
+<canvas id="chart" width="720" height="320"></canvas>
+<p class="note small">This is an estimate. The tool fits T(t) = e<sup>−kt</sup> to your steps and reports the thickness where only 3 % of the light gets through. Light lost at the surface is fitted separately and left out of the TD. HueForge's own TD definition may differ slightly, so compare against a known filament once.</p>
+<div class="row"><label for="fil" style="margin:0">Save to</label><select id="fil"></select><button id="save" disabled>Save TD to library</button></div>
+<div id="saved"></div>
+</div></div></div>
+<script type="module" src="td-meter.js"></script></body></html>

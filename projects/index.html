@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Projects</title><link rel="stylesheet" href="../assets/common.css">
+<style>.pj{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.pj .th{width:64px;height:64px;border-radius:8px;object-fit:cover;background:var(--panel2);flex:none}.pj .info{flex:1;min-width:160px}
+.pj .info input{width:100%}.pj button,.pj .btn{padding:6px 10px}</style></head>
+<body><div class="wrap">
+<h1>Projects</h1>
+<p class="muted">Saved work from every tool. It is stored in this browser only. Export to keep a backup or move it to another device.</p>
+<div class="row" style="margin-bottom:12px"><button class="ghost" id="exp">Export all</button><button class="ghost" id="imp">Import</button></div>
+<div id="msg"></div>
+<div class="card" id="list"></div>
+</div>
+<script type="module" src="projects.js"></script></body></html>

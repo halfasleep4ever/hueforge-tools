@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HueForge Tools</title><link rel="stylesheet" href="assets/common.css">
+<style>.tool{display:flex;flex-direction:column;gap:6px;text-decoration:none;color:var(--text)}.tool:hover{border-color:var(--accent)}.tool b{font-size:17px}.hero{padding:28px 0 8px}</style></head>
+<body><div class="wrap"><div class="hero"><h1>HueForge Tools</h1>
+<p class="muted">Twelve free tools for HueForge and multi-colour printing. They share one filament library. Everything runs in your browser: your pictures and files are never uploaded.</p></div>
+<div class="grid" id="g"></div>
+<p class="muted small" style="margin-top:32px">Made by Daniel. Not affiliated with HueForge.</p></div>
+<script type="module">
+const T=[["image-prep","Image Prep","all-in-one prep","Upscale, crop to your plate, remove the background and reduce to clean colour bands."],
+["palette-match","Palette Match","recolour to your filaments","Recolour the picture using only filaments you own, and compare palettes."],
+["compass","Compass","image guidance","Drop a picture: get a suggested HueForge mode, prep steps and filaments from your library."],
+["library","Filament Library","your inventory","Your filaments with hex, brand and TD. Every tool reads it."],
+["td-meter","TD Meter","measure TD","Print a step card, photograph it against a window, and get the TD of your filament.","NEW"],
+["frame-studio","Frame Studio","a frame for your print","Type your print size and get a ready-to-slice frame STL."],
+["puzzle-studio","Puzzle Studio","print it as a jigsaw","Cut a finished HueForge 3MF into interlocking puzzle pieces; colour swaps stay the same."],
+["svg-convert","SVG Convert","image to vector","PNG or JPEG to a clean layered SVG, one group per colour."],
+["text-studio","Text Studio","text on your print","Add a name or title, and check it stays readable at print size."],
+["logo-chain-studio","Logo Chain Studio","logo to necklace","Turn a flat logo into a pendant on a print-in-place chain."],
+["wall-art-studio","Wall Art Studio","svg to wall art","SVG or picture to flat multi-colour wall art, with a frame, as 3MF and STL."],
+["projects","Projects","saved work","Your saved work from every tool, in one place."]];
+document.getElementById("g").innerHTML=T.map(([s,n,k,b,badge])=>`<a class="card tool" href="${s}/"><span class="row"><b>${n}</b>${badge?`<span class="badge">${badge}</span>`:""}</span><span class="muted small">${k}</span><span>${b}</span></a>`).join("");
+</script></body></html>

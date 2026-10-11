@@ -1,0 +1,73 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Puzzle Studio</title><link rel="stylesheet" href="../assets/common.css">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<style>.view{height:min(70vh,560px);min-height:300px;padding:0;overflow:hidden}.f2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}.f2 input{width:100%}.stat b{font-family:var(--mono)}</style></head>
+<body><div class="wrap">
+<h1>Puzzle Studio <span class="badge">BETA</span></h1>
+<p class="muted">Cut a finished HueForge 3MF into jigsaw pieces. Size, heights and colour swaps stay the same.</p>
+<div class="cols">
+ <div class="card">
+  <div class="drop" id="drop">Drop a 3MF or STL here, or click</div>
+  <div id="file" class="small muted" style="margin-top:8px"></div>
+  <h2>Pieces</h2>
+  <div class="f2">
+   <div><label for="rows">Rows</label><input id="rows" type="number" min="1" max="20" value="3"></div>
+   <div><label for="cols">Columns</label><input id="cols" type="number" min="1" max="20" value="4"></div>
+   <div><label for="knob">Knob size (mm, 0 = auto)</label><input id="knob" type="number" step="0.5" min="0" value="0"></div>
+   <div><label for="gap">Gap (mm)</label><input id="gap" type="number" step="0.05" min="0" value="0.2"></div>
+  </div>
+  <div class="row" style="margin-top:12px"><button id="cut" disabled>Cut puzzle</button><button id="shuffle" class="ghost" disabled>New shapes</button></div>
+  <div id="stats" class="stat small" style="margin-top:12px"></div>
+  <div id="warn"></div>
+  <div class="row" style="margin-top:12px"><button id="dl3mf" disabled>Download 3MF</button><button id="dlzip" class="ghost" disabled>STLs (zip)</button><button id="save" class="ghost" disabled>Save</button></div>
+  <p class="muted small">Nothing changes until you press Cut. The 3MF keeps the original print settings and colour-change layers. Each piece is its own object, in place.</p>
+ </div>
+ <div class="card view" id="view"></div>
+</div></div>
+<script type="module">
+import { header, dropZone, download } from "../assets/ui.js";
+import { saveProject } from "../assets/projects.js";
+import { loadDeps, read3MF, parseSTL, write3MF, writeSTL, zipFiles, sourceExtruder, createViewer, bounds } from "../assets/mesh3d.js";
+import { cutPuzzle } from "./puzzle.js";
+import * as THREE from "three"; import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+header("Puzzle Studio");
+const $ = id => document.getElementById(id);
+let src = null, result = null, seed = 7;
+const depsP = loadDeps();
+const viewer = createViewer(THREE, OrbitControls, $("view"));
+const busy = (on, msg) => { ["cut", "shuffle"].forEach(b => $(b).disabled = on || !src); if (msg) $("stats").textContent = msg; };
+const COLORS = ["#e9c46a", "#2a9d8f", "#e76f51", "#8ab17d", "#f4a261", "#6d9dc5", "#c77dff", "#b5838d"];
+dropZone($("drop"), { accept: ".3mf,.stl", onFiles: async ([f]) => {
+  result = null; ["dl3mf", "dlzip", "save"].forEach(b => $(b).disabled = true); $("warn").innerHTML = "";
+  busy(true, "Reading " + f.name + "…"); await depsP;
+  try {
+    const buf = await f.arrayBuffer();
+    if (/\.3mf$/i.test(f.name)) { const r = read3MF(buf); src = { name: f.name, mesh: r.mesh, files: r.files, is3mf: true, extruder: sourceExtruder(r.files) }; }
+    else src = { name: f.name, mesh: parseSTL(buf), files: null, is3mf: false, extruder: 1 };
+  } catch (e) { src = null; busy(false, ""); $("warn").innerHTML = `<p class="note bad small">${e.message}</p>`; return; }
+  const b = bounds(src.mesh);
+  const meta = src.files ? Object.keys(src.files).filter(k => /^Metadata\//.test(k)).length : 0;
+  $("file").innerHTML = `<b>${f.name}</b><br>${b.size[0].toFixed(1)} × ${b.size[1].toFixed(1)} × ${b.size[2].toFixed(2)} mm · ${(src.mesh.idx.length / 3).toLocaleString()} triangles${src.is3mf ? ` · ${meta} settings files kept` : ""}`;
+  if (src.files && src.files["Metadata/custom_gcode_per_layer.xml"]) $("file").innerHTML += `<br>Colour changes found: ${(new TextDecoder().decode(src.files["Metadata/custom_gcode_per_layer.xml"]).match(/<layer /g) || []).length}`;
+  viewer.show([{ mesh: src.mesh, color: "#bbbbbb" }]);
+  busy(false, "Ready. Choose pieces and press Cut.");
+} });
+async function cut() {
+  if (!src) return; busy(true, "Cutting… this can take a few seconds."); await new Promise(r => setTimeout(r, 30));
+  const opt = { rows: +$("rows").value || 1, cols: +$("cols").value || 1, knob: +$("knob").value || 0, gap: Math.max(0, +$("gap").value || 0), seed };
+  const t0 = performance.now();
+  try { result = cutPuzzle(src.mesh, opt); } catch (e) { busy(false, ""); $("warn").innerHTML = `<p class="note bad small">${e.message}</p>`; return; }
+  const b0 = bounds(src.mesh), zs = result.pieces.map(p => bounds(p.mesh));
+  const zmax = Math.max(...zs.map(z => z.max[2])), zmin = Math.min(...zs.map(z => z.min[2]));
+  $("stats").innerHTML = `${result.pieces.length} pieces of about <b>${result.cell[0].toFixed(1)} × ${result.cell[1].toFixed(1)} mm</b>, knob <b>${result.knob.toFixed(1)} mm</b><br>Height before / after: <b>${b0.min[2].toFixed(2)}–${b0.max[2].toFixed(2)}</b> / <b>${zmin.toFixed(2)}–${zmax.toFixed(2)} mm</b><br>Volume kept: <b>${(100 * result.totalVol / result.origVol).toFixed(1)}%</b> (the rest is the gap) · ${((performance.now() - t0) / 1000).toFixed(1)} s`;
+  $("warn").innerHTML = result.warnings.length ? `<p class="note small">Check these pieces:<br>${result.warnings.join("<br>")}</p>` : `<p class="note ok small">No pieces look too small.</p>`;
+  viewer.show(result.pieces.map((p, i) => ({ mesh: p.mesh, color: COLORS[(p.row * 3 + p.col) % COLORS.length] })), { keepView: true });
+  ["dl3mf", "dlzip", "save"].forEach(b => $(b).disabled = false); busy(false);
+}
+$("cut").onclick = cut;
+$("shuffle").onclick = () => { seed = (seed * 31 + 17) % 100000; cut(); };
+const base = () => src.name.replace(/\.(3mf|stl)$/i, "");
+$("dl3mf").onclick = () => download(base() + "_puzzle.3mf", write3MF(result.pieces.map(p => ({ name: p.name, mesh: p.mesh, extruder: src.extruder })), { keep: src.files, title: "HueForge Tools Puzzle Studio" }), "model/3mf");
+$("dlzip").onclick = () => { const m = {}; result.pieces.forEach(p => m[`${base()}_${p.name}.stl`] = writeSTL(p.mesh)); download(base() + "_puzzle_stl.zip", zipFiles(m), "application/zip"); };
+$("save").onclick = async () => { await saveProject({ tool: "puzzle-studio", name: base() + " puzzle", data: { file: src.name, rows: +$("rows").value, cols: +$("cols").value, knob: +$("knob").value, gap: +$("gap").value, seed } }); $("save").textContent = "Saved"; };
+</script></body></html>

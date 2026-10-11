@@ -1,0 +1,34 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Image Prep · HueForge Tools</title><link rel="stylesheet" href="../assets/common.css">
+<style>
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.tabs button{flex:1 1 auto;padding:8px 6px;font-size:14px}.tabs button.on{background:var(--accent);color:#111}
+.stage{position:relative;display:inline-block;max-width:100%;touch-action:none}.stage canvas{display:block;max-height:80vh;width:auto}
+.cbox{position:absolute;border:2px solid var(--accent);box-shadow:0 0 0 9999px #0008;cursor:move;display:none}
+.cbox i{position:absolute;right:-9px;bottom:-9px;width:18px;height:18px;background:var(--accent);border-radius:50%;cursor:nwse-resize}
+.panel{display:none}.panel.on{display:block}input[type=range]{width:100%}
+</style></head><body><div class="wrap">
+<h1>Image Prep</h1><p class="muted">Upscale, crop, remove the background and reduce colours. Do the steps in any order. Undo any step.</p>
+<div class="cols"><div>
+<div class="drop" id="drop">Drop a picture here, or tap to choose</div>
+<div class="card" id="tools" style="margin-top:12px;display:none">
+<div class="tabs"><button class="ghost" data-t="up">Upscale</button><button class="ghost" data-t="crop">Crop</button><button class="ghost" data-t="bg">Background</button><button class="ghost" data-t="post">Posterize</button></div>
+<div class="panel" id="p-up"><label>Size</label><select id="upF"><option value="2">2x</option><option value="4">4x</option></select>
+<label>Sharpening <span id="upSv"></span></label><input type="range" id="upS" min="0" max="1" step="0.05" value="0.35">
+<p class="small muted">Bicubic resample plus light sharpening. This is not AI upscaling: it cannot add detail that is not in the picture.</p></div>
+<div class="panel" id="p-crop"><label>Shape</label><select id="cropA"></select>
+<p class="small muted">Drag the box. Drag the dot to resize.</p><p class="small" id="cropInfo"></p></div>
+<div class="panel" id="p-bg"><label>Method</label><select id="bgM"><option value="auto">Auto: border colour, flood fill</option><option value="pick">Click the picture to pick a colour</option></select>
+<label><input type="checkbox" id="bgC" checked> Only connected area (flood fill)</label>
+<label>Tolerance <span id="bgTv"></span></label><input type="range" id="bgT" min="1" max="60" value="12">
+<label>Edge feather <span id="bgFv"></span> px</label><input type="range" id="bgF" min="0" max="6" value="1">
+<p class="small" id="bgInfo"></p></div>
+<div class="panel" id="p-post"><label>Colour bands <span id="poNv"></span></label><input type="range" id="poN" min="2" max="12" value="5">
+<label>Method</label><select id="poM"><option value="luma">By brightness (grey bands)</option><option value="lumac">By brightness (keep colour)</option><option value="colour">By colour (k-means)</option></select>
+<label>Smoothing <span id="poSv"></span></label><input type="range" id="poS" min="0" max="3" value="1">
+<label>Remove specks smaller than <span id="poKv"></span> px</label><input type="range" id="poK" min="0" max="60" value="8"></div>
+<div class="row" style="margin-top:12px"><button id="apply">Apply step</button><button class="ghost" id="undo">Undo</button><button class="ghost" id="reset">Reset</button></div>
+<div class="row" style="margin-top:8px"><button class="ghost" id="exp">Export PNG</button><button class="ghost" id="save">Save project</button></div>
+<p class="small muted" id="hist"></p></div>
+</div><div><div class="stage" id="stage"><canvas id="cv"></canvas><div class="cbox" id="cbox"><i></i></div></div>
+<p class="small muted" id="status"></p></div></div></div>
+<script type="module" src="prep.js"></script></body></html>

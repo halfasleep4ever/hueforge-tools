@@ -1,0 +1,109 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Logo Chain Studio</title><link rel="stylesheet" href="../assets/common.css">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<style>.view{height:min(70vh,560px);min-height:300px;padding:0;overflow:hidden}.f2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}.f2 input,.f2 select{width:100%}
+.chk{display:flex;gap:8px;align-items:center;color:var(--text);font-size:14px}.stat b{font-family:var(--mono)}#flat{width:100%;image-rendering:pixelated;margin-top:8px}
+.map{display:flex;gap:8px;align-items:center;margin:4px 0}.map select{flex:1}</style></head>
+<body><div class="wrap">
+<h1>Logo Chain Studio <span class="badge">ALPHA</span></h1>
+<p class="muted">A flat logo becomes a pendant on a print-in-place chain. Not test printed yet.</p>
+<div class="cols">
+ <div class="card">
+  <div class="drop" id="drop">Drop a PNG or SVG logo here, or click</div>
+  <canvas id="flat" hidden></canvas>
+  <div class="f2">
+   <div><label for="k">Colours</label><select id="k"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></div>
+   <div><label for="pw">Pendant width (mm)</label><input id="pw" type="number" min="15" max="120" value="40"></div>
+  </div>
+  <label class="chk" style="margin-top:8px"><input type="checkbox" id="bg" checked> Remove plain background (corner colour)</label>
+  <div id="maps"></div>
+  <label for="basef">Base plate and chain colour</label><select id="basef" style="width:100%"></select>
+  <h2>Sizes</h2>
+  <div class="f2">
+   <div><label for="base">Base thickness</label><input id="base" type="number" step="0.2" min="0.8" value="1.6"></div>
+   <div><label for="layer">Colour layer</label><input id="layer" type="number" step="0.2" min="0.2" value="0.8"></div>
+   <div><label for="len">Chain length (mm)</label><input id="len" type="number" step="10" min="50" value="450"></div>
+   <div><label for="clear">Link clearance (mm)</label><input id="clear" type="number" step="0.05" min="0.2" value="0.4"></div>
+   <div><label for="bedw">Bed width (mm)</label><input id="bedw" type="number" value="250"></div>
+   <div><label for="bedh">Bed depth (mm)</label><input id="bedh" type="number" value="250"></div>
+  </div>
+  <div class="row" style="margin-top:12px"><button id="build" disabled>Build</button></div>
+  <div id="stats" class="stat small" style="margin-top:12px"></div>
+  <div id="warn"></div>
+  <div class="row" style="margin-top:12px"><button id="dl3mf" disabled>Download 3MF</button><button id="dlstl" class="ghost" disabled>STL</button><button id="dlzip" class="ghost" disabled>STLs per colour</button><button id="save" class="ghost" disabled>Save</button></div>
+  <p class="muted small">Print flat, no supports. Do not move the links before the print is done. After printing, flex each link gently to free it. Add a clasp or tie the free end.</p>
+ </div>
+ <div class="card view" id="view"></div>
+</div></div>
+<script type="module">
+import { header, dropZone, download, loadImage } from "../assets/ui.js";
+import { getFilaments, hexToRgb, onLibraryChange } from "../assets/library.js";
+import { saveProject } from "../assets/projects.js";
+import { loadDeps, write3MF, writeSTL, zipFiles, mergeMeshes, createViewer } from "../assets/mesh3d.js";
+import { quantize, despeckle, buildNecklace, CHAIN } from "./chain.js";
+import * as THREE from "three"; import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+header("Logo Chain Studio");
+const $ = id => document.getElementById(id);
+const depsP = loadDeps(), viewer = createViewer(THREE, OrbitControls, $("view"));
+let img = null, fileName = "logo", Q = null, assign = [], out = null;
+const fil = () => getFilaments();
+const opts = sel => fil().map(f => `<option value="${f.id}" ${f.id === sel ? "selected" : ""}>${f.name} (${f.brand})</option>`).join("");
+const nearest = rgb => { let b = null, bd = Infinity; for (const f of fil()) { const c = hexToRgb(f.hex), d = (c[0] - rgb[0]) ** 2 + (c[1] - rgb[1]) ** 2 + (c[2] - rgb[2]) ** 2; if (d < bd) { bd = d; b = f; } } return b; };
+const byId = id => fil().find(f => f.id === id) || fil()[0];
+function fillBase(sel) { $("basef").innerHTML = opts(sel || $("basef").value || (fil().find(f => /black/i.test(f.name)) || fil()[0]).id); }
+fillBase(); onLibraryChange(() => { fillBase(); drawMaps(); });
+dropZone($("drop"), { accept: ".png,.svg,image/png,image/svg+xml,.jpg,.jpeg", onFiles: async ([f]) => {
+  try { img = await loadImage(f); } catch { $("warn").innerHTML = `<p class="note bad small">Could not read that image.</p>`; return; }
+  fileName = f.name.replace(/\.[^.]+$/, ""); $("drop").textContent = f.name; analyse();
+} });
+function grid() { // raster at about 0.25 mm per pixel
+  const W = +$("pw").value || 40, px = Math.max(0.2, W / 240), gw = Math.round(W / px);
+  const ar = (img.naturalHeight || img.height || 1) / (img.naturalWidth || img.width || 1), gh = Math.max(4, Math.round(gw * ar));
+  const c = document.createElement("canvas"); c.width = gw; c.height = gh; const x = c.getContext("2d", { willReadFrequently: true });
+  x.imageSmoothingEnabled = true; x.drawImage(img, 0, 0, gw, gh); return { data: x.getImageData(0, 0, gw, gh).data, gw, gh, px };
+}
+function analyse() {
+  if (!img) return; const G = grid(), k = +$("k").value;
+  const bg = $("bg").checked && G.data[3] > 200 ? [G.data[0], G.data[1], G.data[2]] : null;
+  const q = quantize(G.data, G.gw, G.gh, k, { bg });
+  Q = { ...G, labels: despeckle(q.labels, G.gw, G.gh), centers: q.centers };
+  assign = Q.centers.map(c => nearest(c).id);
+  drawMaps(); drawFlat(); $("build").disabled = !Q.centers.length; build();
+}
+function drawMaps() {
+  if (!Q) { $("maps").innerHTML = ""; return; }
+  $("maps").innerHTML = `<label>Logo colours → your filaments</label>` + Q.centers.map((c, i) => `<div class="map"><span class="swatch" style="background:rgb(${c.map(Math.round)})"></span>→<select data-i="${i}">${opts(assign[i])}</select></div>`).join("");
+  $("maps").querySelectorAll("select").forEach(s => s.onchange = () => { assign[+s.dataset.i] = s.value; drawFlat(); build(); });
+}
+function drawFlat() {
+  const c = $("flat"); c.hidden = false; c.width = Q.gw; c.height = Q.gh; const x = c.getContext("2d"), im = x.createImageData(Q.gw, Q.gh);
+  const base = hexToRgb(byId($("basef").value).hex), cols = assign.map(id => hexToRgb(byId(id).hex));
+  for (let i = 0; i < Q.labels.length; i++) { const l = Q.labels[i]; if (l < 0) continue; const c2 = cols[l] || base; im.data.set([...c2, 255], i * 4); }
+  x.putImageData(im, 0, 0);
+}
+async function build() {
+  if (!Q) return; await depsP; $("stats").textContent = "Building…"; await new Promise(r => setTimeout(r, 20));
+  const baseId = $("basef").value, c = { ...CHAIN, clear: Math.max(0.2, +$("clear").value || 0.4) };
+  // colours that use the base filament are part of the base object
+  const ids = [baseId, ...new Set(assign.filter(id => id !== baseId))];
+  const labels = Q.labels.map(l => l < 0 ? -1 : ids.indexOf(assign[l]));
+  try {
+    out = buildNecklace({ labels, w: Q.gw, h: Q.gh, px: Q.px, nColors: ids.length, baseColor: 0, base: +$("base").value || 1.6, layer: +$("layer").value || 0.8,
+      length: +$("len").value || 450, bedW: +$("bedw").value || 250, bedH: +$("bedh").value || 250, c });
+  } catch (e) { $("warn").innerHTML = `<p class="note bad small">${e.message}</p>`; return; }
+  out.objects = [{ name: byId(baseId).name + " base + chain", mesh: mergeMeshes([out.base, ...out.links]), extruder: 1, hex: byId(baseId).hex },
+    ...out.layers.map(l => ({ name: byId(ids[l.ci]).name, mesh: l.mesh, extruder: l.ci + 1, hex: byId(ids[l.ci]).hex }))];
+  const d = out.chain.dims;
+  $("stats").innerHTML = `Pendant <b>${out.size[0].toFixed(1)} × ${out.size[1].toFixed(1)} mm</b> · ${out.objects.length} colour${out.objects.length > 1 ? "s" : ""}<br>Chain <b>${out.links.length}</b> links, about <b>${out.chain.length.toFixed(0)} mm</b>, ${d.height.toFixed(1)} mm tall<br>Plate layout <b>${out.layoutSize[0].toFixed(0)} × ${out.layoutSize[1].toFixed(0)} mm</b><br>Filament order: ${out.objects.map(o => `${o.extruder}. ${o.name}`).join(", ")}`;
+  $("warn").innerHTML = out.warn.map(w => `<p class="note small">${w}</p>`).join("");
+  viewer.show(out.objects.map(o => ({ mesh: o.mesh, color: o.hex })));
+  ["dl3mf", "dlstl", "dlzip", "save"].forEach(b => $(b).disabled = false);
+}
+["k", "pw", "bg"].forEach(id => $(id).addEventListener("change", analyse));
+["basef", "base", "layer", "len", "clear", "bedw", "bedh"].forEach(id => $(id).addEventListener("change", () => { if (Q) { drawFlat(); build(); } }));
+$("build").onclick = build;
+$("dl3mf").onclick = () => download(fileName + "_necklace.3mf", write3MF(out.objects, { title: "HueForge Tools Logo Chain Studio" }), "model/3mf");
+$("dlstl").onclick = () => download(fileName + "_necklace.stl", writeSTL(mergeMeshes(out.objects.map(o => o.mesh))), "model/stl");
+$("dlzip").onclick = () => { const m = {}; out.objects.forEach(o => m[`${fileName}_${o.extruder}_${o.name.replace(/\W+/g, "_")}.stl`] = writeSTL(o.mesh)); download(fileName + "_necklace_stl.zip", zipFiles(m), "application/zip"); };
+$("save").onclick = async () => { await saveProject({ tool: "logo-chain-studio", name: fileName + " necklace", data: { file: fileName, k: +$("k").value, width: +$("pw").value, length: +$("len").value } }); $("save").textContent = "Saved"; };
+</script></body></html>

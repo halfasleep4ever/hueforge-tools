@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SVG Convert</title><link rel="stylesheet" href="../assets/common.css">
+<style>.pv{display:grid;gap:12px;grid-template-columns:1fr 1fr}@media(max-width:600px){.pv{grid-template-columns:1fr}}
+.pv img,.pv canvas{width:100%;height:auto;display:block}#layers td{font-size:14px}#svgimg{background:repeating-conic-gradient(#8882 0 25%,#0000 0 50%) 0 0/16px 16px;border-radius:8px}
+output{font-family:var(--mono);font-size:13px;color:var(--text)}</style></head>
+<body><div class="wrap">
+<h1>SVG Convert</h1><p class="muted">PNG or JPEG to a layered SVG: one group per colour, holes cut out, no gaps between colours.</p>
+<div class="cols">
+<div class="card">
+  <div class="drop" id="drop">Drop a PNG or JPEG here, or click</div>
+  <label>Colours</label>
+  <select id="mode"><option value="auto">Pick for me</option><option value="lib">From my filaments</option></select>
+  <div id="autoBox"><label>Number of colours <output id="kv">5</output></label><input type="range" id="k" min="2" max="12" value="5"></div>
+  <div id="libBox" hidden><div id="lib" class="small"></div></div>
+  <label>Remove specks smaller than <output id="sv">12</output> px</label><input type="range" id="speck" min="0" max="200" value="12">
+  <label>Smooth edges <output id="ev">1.0</output> px</label><input type="range" id="eps" min="0" max="3" step="0.1" value="1">
+  <label>Working size (small pictures are scaled up for smoother edges)</label><select id="size"><option>600</option><option selected>1000</option><option>1600</option></select>
+  <label>Layers</label><select id="stack"><option value="1">Stacked (each colour covers the colours above it, no seams)</option><option value="0">Exact (each colour only its own area)</option></select>
+  <label>Width in mm (blank = pixels)</label><input type="number" id="wmm" min="1" step="1" placeholder="e.g. 150">
+</div>
+<div>
+  <div class="card"><div class="pv"><div><div class="small muted">Picture</div><canvas id="src"></canvas></div><div><div class="small muted">SVG</div><img id="svgimg" alt=""></div></div>
+  <p id="status" class="muted small">Drop a picture to start.</p>
+  <div class="row"><button id="dl" disabled>Download SVG</button><button id="dlz" class="ghost" disabled>Zip: one SVG per colour</button><button id="save" class="ghost" disabled>Save to Projects</button></div></div>
+  <div class="card" style="margin-top:16px"><h2 style="margin-top:0">Layers, bottom to top</h2><table id="layers"><tr><td class="muted">No layers yet.</td></tr></table></div>
+</div></div></div>
+<script type="module" src="app.js"></script></body></html>

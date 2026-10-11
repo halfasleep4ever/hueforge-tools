@@ -1,0 +1,33 @@
+// Run: node tests/imaging_test.mjs
+import assert from "node:assert/strict";
+import * as I from "../assets/imaging.js";
+let pass = 0, fail = 0;
+const t = (name, fn) => { try { fn(); pass++; console.log("ok  ", name); } catch (e) { fail++; console.log("FAIL", name, "\n   ", e.message); } };
+const solid = (w, h, f) => { const im = I.makeImage(w, h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const c = f(x, y); im.data.set([...c, c[3] ?? 255].slice(0, 4), (y * w + x) * 4); } return im; };
+const px = (im, x, y) => [...im.data.subarray((y * im.width + x) * 4, (y * im.width + x) * 4 + 4)];
+
+t("Lab white/black", () => { const w = I.rgbToLab(255, 255, 255), b = I.rgbToLab(0, 0, 0); assert(Math.abs(w[0] - 100) < 0.1 && Math.abs(b[0]) < 0.1); });
+t("Lab round trip", () => { for (const c of [[10, 200, 30], [255, 0, 0], [128, 128, 128], [3, 7, 250]]) I.labToRgb(...I.rgbToLab(...c)).forEach((v, i) => assert(Math.abs(v - c[i]) <= 1, c + "")); });
+t("luminance order", () => { assert(I.luminance(0, 0, 0) === 0); assert(Math.abs(I.luminance(255, 255, 255) - 1) < 1e-6); assert(I.luminance(0, 255, 0) > I.luminance(255, 0, 0)); });
+const four = solid(40, 40, (x, y) => x < 20 ? (y < 20 ? [255, 0, 0] : [0, 0, 255]) : (y < 20 ? [255, 255, 255] : [0, 0, 0]));
+t("kmeans finds 4 colours", () => { const p = I.kmeansLab(four, 4); assert.equal(p.length, 4); for (const c of [[255, 0, 0], [0, 0, 255], [255, 255, 255], [0, 0, 0]]) assert(p.some(q => I.deltaE(I.rgbToLab(...q), I.rgbToLab(...c)) < 3), "missing " + c); assert.deepEqual(p[0], [0, 0, 0]); });
+t("median cut finds 4 colours", () => { const p = I.medianCut(four, 4); assert.equal(p.length, 4); assert.deepEqual(p[3], [255, 255, 255]); });
+t("mapToPalette nearest + counts", () => { const m = I.mapToPalette(four, [[250, 10, 10], [20, 20, 20], [240, 240, 240], [10, 10, 230]]); assert.deepEqual(m.counts, [400, 400, 400, 400]); assert.deepEqual(px(m.image, 0, 0), [250, 10, 10, 255]); assert(m.meanDeltaE < 10); });
+const grad = solid(64, 8, x => [x * 4, x * 4, x * 4]);
+t("dither mixes two colours on a gradient", () => { const m = I.mapToPalette(grad, [[0, 0, 0], [255, 255, 255]], { dither: true }); let mid = 0; for (let y = 0; y < 8; y++) mid += px(m.image, 32, y)[0] ? 1 : 0; const plain = I.mapToPalette(grad, [[0, 0, 0], [255, 255, 255]]); assert(m.counts[0] > 0 && m.counts[1] > 0); assert(m.counts.join() !== "0,0"); assert(plain.counts[0] !== m.counts[0] || mid > 0); });
+t("suggestColours picks the right ones", () => { const lib = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 255], [0, 0, 0], [255, 255, 0]]; const s = I.suggestColours(four, lib, 4).sort(); assert.deepEqual(s, [0, 2, 3, 4]); });
+t("crop", () => { const c = I.crop(four, 18, 18, 4, 4); assert.equal(c.width, 4); assert.deepEqual(px(c, 0, 0), [255, 0, 0, 255]); assert.deepEqual(px(c, 3, 3), [0, 0, 0, 255]); });
+t("upscale size and flat colour kept", () => { const u = I.upscale(four, 2); assert.equal(u.width, 80); assert.equal(u.height, 80); assert.deepEqual(px(u, 5, 5), [255, 0, 0, 255]); assert.deepEqual(px(u, 75, 75), [0, 0, 0, 255]); });
+t("upscale 4x keeps alpha", () => { const a = solid(4, 4, () => [10, 20, 30, 0]); const u = I.upscale(a, 4); assert.equal(u.width, 16); assert.equal(px(u, 8, 8)[3], 0); });
+const disk = solid(50, 50, (x, y) => Math.hypot(x - 25, y - 25) < 12 ? [200, 30, 30] : [240, 240, 240]);
+t("borderColour", () => assert.deepEqual(I.borderColour(disk), [240, 240, 240]));
+t("flood background removal", () => { const r = I.removeBackground(disk, [240, 240, 240], { tolerance: 10, feather: 0 }); assert.equal(px(r, 0, 0)[3], 0); assert.equal(px(r, 25, 25)[3], 255); });
+t("flood does not remove enclosed same colour", () => { const ring = solid(30, 30, (x, y) => { const d = Math.hypot(x - 15, y - 15); return d < 4 ? [240, 240, 240] : d < 10 ? [0, 0, 0] : [240, 240, 240]; }); const f = I.removeBackground(ring, [240, 240, 240], { feather: 0 }), g = I.removeBackground(ring, [240, 240, 240], { feather: 0, mode: "global" }); assert.equal(px(f, 15, 15)[3], 255); assert.equal(px(g, 15, 15)[3], 0); });
+t("feather softens edge", () => { const r = I.removeBackground(disk, [240, 240, 240], { feather: 2 }); let soft = 0; for (let i = 3; i < r.data.length; i += 4) if (r.data[i] > 0 && r.data[i] < 255) soft++; assert(soft > 0); });
+t("click seed removal", () => { const r = I.removeBackground(disk, [200, 30, 30], { seeds: [[25, 25]], feather: 0 }); assert.equal(px(r, 25, 25)[3], 0); assert.equal(px(r, 0, 0)[3], 255); });
+t("posterizeLuma gives n bands", () => { const p = I.posterizeLuma(grad, 4); assert.equal(new Set([...p.index]).size, 4); const r = I.renderIndex(p.index, p.palette, 64, 8); assert(px(r, 0, 0)[0] < px(r, 63, 0)[0]); });
+t("posterizeColour", () => { const p = I.posterizeColour(four, 4); assert.equal(new Set([...p.index]).size, 4); });
+t("removeSpecks removes 1px dot", () => { const idx = new Int16Array(100).fill(0); idx[55] = 1; const r = I.removeSpecks(idx, 10, 10, 4); assert.equal(r[55], 0); const big = new Int16Array(100).fill(0); for (const i of [44, 45, 54, 55, 64, 65]) big[i] = 1; assert.equal(I.removeSpecks(big, 10, 10, 4)[55], 1); });
+t("smoothIndex removes isolated pixel", () => { const idx = new Int16Array(25).fill(2); idx[12] = 0; assert.equal(I.smoothIndex(idx, 5, 5)[12], 2); });
+t("analyse flat logo vs gradient", () => { const a = I.analyse(disk), b = I.analyse(grad); assert(a.borderUniformity > 0.95); assert(a.backgroundShare > 0.7); assert(a.distinctColours <= 3); assert(b.distinctColours >= 10); assert(b.tonalRange > 80); });
+console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);
