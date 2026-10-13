@@ -1,22 +1,157 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HueForge Tools</title><link rel="stylesheet" href="assets/common.css">
-<style>.tool{display:flex;flex-direction:column;gap:6px;text-decoration:none;color:var(--text)}.tool:hover{border-color:var(--accent)}.tool b{font-size:17px}.hero{padding:28px 0 8px}</style></head>
-<body><div class="wrap"><div class="hero"><h1>HueForge Tools</h1>
-<p class="muted">Twelve free tools for HueForge and multi-colour printing. They share one filament library. Everything runs in your browser: your pictures and files are never uploaded.</p></div>
-<div class="grid" id="g"></div>
-<p class="muted small" style="margin-top:32px">Made by Daniel. Not affiliated with HueForge.</p></div>
+<title>HueForge Tools</title>
+<meta name="description" content="Twelve free browser tools for HueForge and multi-colour printing. Nothing is uploaded.">
+<link rel="stylesheet" href="assets/common.css">
+<style>
+:root{
+  --a-page:oklch(100% 0 0);--a-alt:oklch(97.2% .002 286);--a-tile:oklch(97.2% .002 286);--a-tile-on-alt:oklch(100% 0 0);
+  --a-ink:oklch(21.8% .004 286);--a-muted:oklch(52.5% .008 286);--a-line:oklch(88% .004 286);
+  --a-blue:oklch(56% .19 255);--a-blue-hover:oklch(61% .19 255);--a-link:oklch(52% .19 255);--a-new:oklch(52% .15 45);
+  --a-on-blue:oklch(100% 0 0);--a-nav:oklch(98% .002 286 / .78);
+  --a-font:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",sans-serif;
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--s8:72px;--s9:112px;
+  --t-sm:.875rem;--t-base:1.0625rem;--t-md:1.3125rem;--t-lg:clamp(2rem,3.4vw + .8rem,3rem);--t-xl:clamp(3rem,6vw + 1rem,5rem);
+  --r-tile:28px;--r-pill:980px;--ease:cubic-bezier(.16,1,.3,1);--z-nav:10}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --a-page:oklch(14% .004 286);--a-alt:oklch(18% .004 286);--a-tile:oklch(20% .004 286);--a-tile-on-alt:oklch(23% .004 286);
+  --a-ink:oklch(96% .002 286);--a-muted:oklch(70% .008 286);--a-line:oklch(30% .004 286);
+  --a-blue:oklch(60% .19 255);--a-blue-hover:oklch(65% .18 255);--a-link:oklch(70% .15 250);--a-new:oklch(74% .15 55);
+  --a-nav:oklch(16% .004 286 / .72)}}
+html,body{overflow-x:clip}
+body{background:var(--a-page);color:var(--a-ink);font:var(--t-base)/1.47 var(--a-font);letter-spacing:-.022em;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--a-blue);outline-offset:2px;border-radius:6px}
+
+/* frosted nav: a real overlay, content scrolls under it */
+.nav{position:sticky;top:0;z-index:var(--z-nav);background:var(--a-nav);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid var(--a-line)}
+.nav .in{max-width:1024px;margin:0 auto;padding:0 var(--s5);height:48px;display:flex;align-items:center;gap:var(--s6)}
+.nav a{text-decoration:none;font-size:var(--t-sm);color:var(--a-ink);opacity:.85;min-height:44px;display:inline-flex;align-items:center}
+.nav a:hover{opacity:1}
+.nav .brand{font-weight:600;opacity:1;margin-right:auto}
+
+.hero{text-align:center;padding:var(--s9) var(--s5) var(--s8)}
+.hero h1{font-size:var(--t-xl);font-weight:700;line-height:1.05;letter-spacing:-.015em;margin:0 auto var(--s4);text-wrap:balance}
+.hero .sub{font-size:var(--t-md);color:var(--a-muted);margin:0 auto var(--s6);max-width:60ch;text-wrap:balance;line-height:1.38}
+.actions{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:var(--s5)}
+.pill{display:inline-flex;align-items:center;min-height:44px;padding:0 var(--s5);border-radius:var(--r-pill);background:var(--a-blue);color:var(--a-on-blue);
+  text-decoration:none;font-weight:500;white-space:nowrap;transition:background-color 200ms var(--ease),transform 120ms var(--ease)}
+.pill:hover{background:var(--a-blue-hover)}
+.pill:active{transform:scale(.98)}
+.more{color:var(--a-link);text-decoration:none;white-space:nowrap;min-height:44px;display:inline-flex;align-items:center}
+.more:hover{text-decoration:underline}
+.more::after{content:"›";margin-left:.25em;font-size:1.15em;line-height:1}
+
+/* the product shot: the filament stack as real 3D layers */
+.shot{margin:var(--s8) auto 0;max-width:880px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);align-items:center;gap:var(--s6)}
+.stage{height:360px;perspective:1400px;display:grid;place-items:center}
+.stack3d{position:relative;width:200px;height:200px;transform-style:preserve-3d;transform:rotateX(58deg) rotateZ(-42deg)}
+.plate{position:absolute;inset:0;border-radius:22px;background:var(--c);transform:translateZ(calc(var(--i) * 16px));transform-style:preserve-3d;
+  box-shadow:inset 0 0 0 1px oklch(0% 0 0 / .08)}
+.plate::before{content:"";position:absolute;inset:0;border-radius:22px;background:var(--c);filter:brightness(.72);transform:translateZ(-8px)}
+.plate::after{content:"";position:absolute;inset:0;border-radius:22px;background:var(--c);filter:brightness(.82);transform:translateZ(-4px)}
+.shadow{position:absolute;inset:-6px;border-radius:28px;background:oklch(0% 0 0 / .14);filter:blur(14px);transform:translateZ(-12px)}
+@media (prefers-reduced-motion: no-preference){
+  .plate{animation:rise 900ms var(--ease) both;animation-delay:calc(var(--i) * 60ms)}
+  @keyframes rise{from{transform:translateZ(calc(var(--i) * 4px));opacity:0}}}
+.legend{list-style:none;margin:0;padding:0;text-align:left}
+.legend li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:var(--s3);padding:var(--s2) 0;border-bottom:1px solid var(--a-line);
+  font-size:var(--t-sm);font-variant-numeric:tabular-nums}
+.legend i{width:14px;height:14px;border-radius:50%;background:var(--c);box-shadow:0 0 0 1px var(--a-line)}
+.legend .td{color:var(--a-muted)}
+.cap{grid-column:1/-1;text-align:center;color:var(--a-muted);font-size:var(--t-sm);margin:0}
+
+/* tool sections */
+.sec{padding:var(--s9) var(--s5)}
+.sec.alt{background:var(--a-alt)}
+.sec .in{max-width:1024px;margin:0 auto}
+.sec h2{font-size:var(--t-lg);font-weight:700;line-height:1.08;letter-spacing:-.01em;margin:0 0 var(--s7);max-width:20ch;text-wrap:balance}
+.sec h2 span{color:var(--a-muted)}
+.tiles{display:grid;gap:var(--s4);grid-template-columns:repeat(2,minmax(0,1fr))}
+.tiles.three,.tiles.big3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.tile{display:flex;flex-direction:column;gap:var(--s3);min-height:220px;padding:var(--s6);border-radius:var(--r-tile);background:var(--a-tile);text-decoration:none;
+  transition:transform 300ms var(--ease)}
+.alt .tile{background:var(--a-tile-on-alt)}
+.tile:hover{transform:scale(1.012)}
+.tile:active{transform:scale(.995)}
+.tile.big{grid-column:1/-1;min-height:200px}
+.tile .new{color:var(--a-new);font-size:var(--t-sm);font-weight:600}
+.tile h3{font-size:var(--t-md);font-weight:700;letter-spacing:-.015em;line-height:1.2;margin:0}
+.tile.big h3{font-size:clamp(1.5rem,2.2vw + .6rem,2rem)}
+.tile p{margin:0;color:var(--a-muted);max-width:42ch}
+.tile .go{margin-top:auto;color:var(--a-link)}
+.tile .go::after{content:"›";margin-left:.25em;font-size:1.15em;line-height:1}
+.tile:hover .go{text-decoration:underline}
+
+.foot{border-top:1px solid var(--a-line);padding:var(--s6) var(--s5) var(--s7);color:var(--a-muted);font-size:var(--t-sm)}
+.foot .in{max-width:1024px;margin:0 auto;display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--s2) var(--s5)}
+
+@media (max-width:820px){
+  .shot{grid-template-columns:minmax(0,1fr);gap:var(--s4)}
+  .stage{height:300px}
+  .tiles,.tiles.three,.tiles.big3{grid-template-columns:minmax(0,1fr)}
+  .tile{min-height:0}
+  .sec{padding:var(--s8) var(--s5)}
+  .hero{padding:var(--s8) var(--s5) var(--s7)}
+}
+@media (max-width:420px){.nav .in{gap:var(--s4);padding:0 var(--s4)}.sec,.hero{padding-left:var(--s4);padding-right:var(--s4)}.tile{padding:var(--s5)}}
+</style></head>
+<body>
+<nav class="nav" aria-label="Site"><div class="in"><a class="brand" href="./">HueForge Tools</a><a href="library/">Filament library</a><a href="projects/">Projects</a></div></nav>
+<main>
+  <section class="hero">
+    <h1>HueForge Tools</h1>
+    <p class="sub">Twelve free tools. One filament library. Nothing leaves your browser.</p>
+    <div class="actions"><a class="pill" href="image-prep/">Open Image Prep</a><a class="more" href="library/">Add your filaments</a></div>
+    <figure class="shot" aria-labelledby="cap">
+      <div class="stage" aria-hidden="true"><div class="stack3d" id="stack"><div class="shadow"></div></div></div>
+      <ol class="legend" id="legend"></ol>
+      <figcaption class="cap" id="cap"></figcaption>
+    </figure>
+  </section>
+  <div id="groups"></div>
+</main>
+<footer class="foot"><div class="in"><span>Everything runs in your browser. Nothing is uploaded.</span><span>Made by Daniel. Not affiliated with HueForge.</span></div></footer>
 <script type="module">
-const T=[["image-prep","Image Prep","all-in-one prep","Upscale, crop to your plate, remove the background and reduce to clean colour bands."],
-["palette-match","Palette Match","recolour to your filaments","Recolour the picture using only filaments you own, and compare palettes."],
-["compass","Compass","image guidance","Drop a picture: get a suggested HueForge mode, prep steps and filaments from your library."],
-["library","Filament Library","your inventory","Your filaments with hex, brand and TD. Every tool reads it."],
-["td-meter","TD Meter","measure TD","Print a step card, photograph it against a window, and get the TD of your filament.","NEW"],
-["frame-studio","Frame Studio","a frame for your print","Type your print size and get a ready-to-slice frame STL."],
-["puzzle-studio","Puzzle Studio","print it as a jigsaw","Cut a finished HueForge 3MF into interlocking puzzle pieces; colour swaps stay the same."],
-["svg-convert","SVG Convert","image to vector","PNG or JPEG to a clean layered SVG, one group per colour."],
-["text-studio","Text Studio","text on your print","Add a name or title, and check it stays readable at print size."],
-["logo-chain-studio","Logo Chain Studio","logo to necklace","Turn a flat logo into a pendant on a print-in-place chain."],
-["wall-art-studio","Wall Art Studio","svg to wall art","SVG or picture to flat multi-colour wall art, with a frame, as 3MF and STL."],
-["projects","Projects","saved work","Your saved work from every tool, in one place."]];
-document.getElementById("g").innerHTML=T.map(([s,n,k,b,badge])=>`<a class="card tool" href="${s}/"><span class="row"><b>${n}</b>${badge?`<span class="badge">${badge}</span>`:""}</span><span class="muted small">${k}</span><span>${b}</span></a>`).join("");
+import { getFilaments } from "./assets/library.js";
+
+// [heading, grey continuation, grid class, tiles]; in 2-column groups the first tile is the big one
+const G = [
+  ["Prepare.", "Get the picture ready.", "big3", [
+    ["image-prep", "Image Prep", "Upscale, crop to your plate, remove the background and reduce to clean colour bands."],
+    ["compass", "Compass", "Drop a picture: get a suggested HueForge mode, prep steps and filaments from your library."],
+    ["palette-match", "Palette Match", "Recolour the picture using only filaments you own, and compare palettes."],
+    ["svg-convert", "SVG Convert", "PNG or JPEG to a clean layered SVG, one group per colour."]]],
+  ["Measure.", "Know your filaments.", "three", [
+    ["td-meter", "TD Meter", "Print a step card, photograph it against a window, and get the TD of your filament.", "New"],
+    ["library", "Filament Library", "Your filaments with hex, brand and TD. Every tool reads it."],
+    ["projects", "Projects", "Your saved work from every tool, in one place."]]],
+  ["Make.", "Turn a print into a thing.", "", [
+    ["puzzle-studio", "Puzzle Studio", "Cut a finished HueForge 3MF into interlocking puzzle pieces; colour swaps stay the same."],
+    ["frame-studio", "Frame Studio", "Type your print size and get a ready-to-slice frame STL."],
+    ["text-studio", "Text Studio", "Add a name or title, and check it stays readable at print size."],
+    ["logo-chain-studio", "Logo Chain Studio", "Turn a flat logo into a pendant on a print-in-place chain."],
+    ["wall-art-studio", "Wall Art Studio", "SVG or picture to flat multi-colour wall art, with a frame, as 3MF and STL."]]]];
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+document.getElementById("groups").innerHTML = G.map(([h, grey, cls, tools], gi) => `
+  <section class="sec${gi % 2 === 0 ? " alt" : ""}" aria-labelledby="g${gi}"><div class="in">
+    <h2 id="g${gi}">${h} <span>${grey}</span></h2>
+    <div class="tiles ${cls}">${tools.map(([slug, title, what, tag], i) => `
+      <a class="tile${i === 0 && cls !== "three" ? " big" : ""}" href="${slug}/">${tag ? `<span class="new">${tag}</span>` : ""}<h3>${title}</h3><p>${what}</p><span class="go">Open</span></a>`).join("")}</div>
+  </div></section>`).join("");
+
+// The product shot: the visitor's own filaments, darkest at the bottom (the order HueForge usually prints them).
+const lum = hex => { const n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255].map(v => (v /= 255) <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4); return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]; };
+let fil = [], mine = false;
+try { mine = !!localStorage.getItem("hft.filaments.v1"); } catch { mine = false; }
+try { fil = (getFilaments() || []).filter(f => /^#[0-9a-f]{6}$/i.test(f.hex || "")); } catch { fil = []; }
+const shown = fil.slice().sort((a, b) => lum(a.hex) - lum(b.hex)).slice(0, 8);
+const tdText = f => f.td !== "" && f.td != null && Number.isFinite(Number(f.td)) ? `TD ${Number(f.td).toFixed(1)}` : "TD not set";
+document.getElementById("stack").insertAdjacentHTML("beforeend", shown.map((f, i) => `<div class="plate" style="--i:${i};--c:${f.hex}"></div>`).join(""));
+document.getElementById("legend").innerHTML = shown.slice().reverse().map(f =>
+  `<li style="--c:${f.hex}"><i aria-hidden="true"></i><span>${esc(f.name || f.hex)}</span><span class="td">${tdText(f)}</span></li>`).join("");
+document.getElementById("cap").textContent = mine
+  ? `Your library${shown.length < fil.length ? ` (${shown.length} of ${fil.length})` : ""}, darkest at the bottom: the order HueForge usually prints them.`
+  : "The starter library, darkest at the bottom: the order HueForge usually prints them. Add yours to see them here.";
 </script></body></html>
