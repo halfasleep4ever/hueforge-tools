@@ -3,7 +3,7 @@ import { chromium } from "/Users/kai/Documents/Work/Career/career-ops/node_modul
 const port = process.argv[2] || 8791, base = `http://localhost:${port}/`;
 const b = await chromium.launch({ executablePath: process.env.CHROME }); const p = await b.newPage();
 const errs = []; p.on("console", m => m.type() === "error" && errs.push(m.text())); p.on("pageerror", e => errs.push(e.message));
-await p.goto(base); const links = await p.$$eval("a.tool", a => a.map(x => x.getAttribute("href")));
+await p.goto(base); const links = await p.$$eval("a.tool, a.tile", a => [...new Set(a.map(x => x.getAttribute("href")))].concat(["library/", "projects/"]));
 console.log("hub tools:", links.length);
 let bad = 0;
 for (const l of links) {

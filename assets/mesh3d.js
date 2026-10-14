@@ -200,7 +200,22 @@ export function createViewer(THREE, OrbitControls, el) {
   scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.6)); const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(1, -2, 3); scene.add(dl);
   const ctl = new OrbitControls(cam, renderer.domElement); ctl.enableDamping = true;
   let group = new THREE.Group(); scene.add(group);
-  const size = () => { const w = el.clientWidth || 400, h = el.clientHeight || 300; renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); };
+  // Fit the model box to the view for this aspect (a phone is narrow: fit the width, not a fixed distance).
+  // Refit on resize until the user moves the camera.
+  let fitBox = null, userMoved = false; ctl.addEventListener("start", () => { userMoved = true; });
+  const fit = () => {
+    if (!fitBox) return; const c = fitBox.getCenter(new THREE.Vector3()), s = fitBox.getSize(new THREE.Vector3());
+    const back = new THREE.Vector3(0, -0.75, 1).normalize(), up0 = new THREE.Vector3(0, 0, 1);
+    const right = new THREE.Vector3().crossVectors(up0, back).normalize(), up = new THREE.Vector3().crossVectors(back, right);
+    const tv = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)), th = tv * cam.aspect; let d = 1;
+    for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) {
+      const p = new THREE.Vector3(x * s.x / 2, y * s.y / 2, z * s.z / 2);
+      d = Math.max(d, p.dot(back) + Math.abs(p.dot(right)) / th, p.dot(back) + Math.abs(p.dot(up)) / tv);
+    }
+    d *= 1.08; ctl.target.copy(c); cam.up.copy(up0); cam.position.copy(c).addScaledVector(back, d);
+    cam.near = d / 100; cam.far = d * 20; cam.updateProjectionMatrix(); ctl.update();
+  };
+  const size = () => { const w = el.clientWidth || 400, h = el.clientHeight || 300; renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); if (!userMoved) fit(); };
   new ResizeObserver(size).observe(el); size();
   (function loop() { requestAnimationFrame(loop); ctl.update(); renderer.render(scene, cam); })();
   return {
@@ -211,8 +226,8 @@ export function createViewer(THREE, OrbitControls, el) {
         group.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0.05, flatShading: true })));
       }
       scene.add(group); if (keepView) return;
-      const box = new THREE.Box3().setFromObject(group); if (box.isEmpty()) return; const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3()).length() || 10;
-      ctl.target.copy(c); cam.up.set(0, 0, 1); cam.position.set(c.x, c.y - s * 0.9, c.z + s * 0.9); cam.near = s / 100; cam.far = s * 20; cam.updateProjectionMatrix();
+      const box = new THREE.Box3().setFromObject(group); if (box.isEmpty()) return;
+      fitBox = box; userMoved = false; fit();
     },
   };
 }

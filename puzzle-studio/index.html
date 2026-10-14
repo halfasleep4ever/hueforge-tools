@@ -27,7 +27,7 @@
 <script type="module">
 import { header, dropZone, download } from "../assets/ui.js";
 import { saveProject } from "../assets/projects.js";
-import { loadDeps, read3MF, parseSTL, write3MF, writeSTL, zipFiles, sourceExtruder, createViewer, bounds } from "../assets/mesh3d.js";
+import { loadDeps, read3MF, parseSTL, write3MF, writeSTL, zipFiles, sourceExtruder, createViewer, bounds, mergeMeshes } from "../assets/mesh3d.js";
 import { cutPuzzle } from "./puzzle.js";
 import * as THREE from "three"; import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 header("Puzzle Studio");
@@ -56,13 +56,30 @@ async function cut() {
   if (!src) return; busy(true, "Cutting… this can take a few seconds."); await new Promise(r => setTimeout(r, 30));
   const opt = { rows: +$("rows").value || 1, cols: +$("cols").value || 1, knob: +$("knob").value || 0, gap: Math.max(0, +$("gap").value || 0), seed };
   const t0 = performance.now();
-  try { result = cutPuzzle(src.mesh, opt); } catch (e) { busy(false, ""); $("warn").innerHTML = `<p class="note bad small">${e.message}</p>`; return; }
+  try { result = await cutInWorker(src.mesh, opt); } catch (e) { busy(false, ""); $("warn").innerHTML = `<p class="note bad small">${e.message}</p>`; return; }
   const b0 = bounds(src.mesh), zs = result.pieces.map(p => bounds(p.mesh));
   const zmax = Math.max(...zs.map(z => z.max[2])), zmin = Math.min(...zs.map(z => z.min[2]));
   $("stats").innerHTML = `${result.pieces.length} pieces of about <b>${result.cell[0].toFixed(1)} × ${result.cell[1].toFixed(1)} mm</b>, knob <b>${result.knob.toFixed(1)} mm</b><br>Height before / after: <b>${b0.min[2].toFixed(2)}–${b0.max[2].toFixed(2)}</b> / <b>${zmin.toFixed(2)}–${zmax.toFixed(2)} mm</b><br>Volume kept: <b>${(100 * result.totalVol / result.origVol).toFixed(1)}%</b> (the rest is the gap) · ${((performance.now() - t0) / 1000).toFixed(1)} s`;
   $("warn").innerHTML = result.warnings.length ? `<p class="note small">Check these pieces:<br>${result.warnings.join("<br>")}</p>` : `<p class="note ok small">No pieces look too small.</p>`;
-  viewer.show(result.pieces.map((p, i) => ({ mesh: p.mesh, color: COLORS[(p.row * 3 + p.col) % COLORS.length] })), { keepView: true });
+  const byColor = new Map(); // one mesh per colour: far fewer GPU uploads than one per piece
+  result.pieces.forEach(p => { const c = COLORS[(p.row * 3 + p.col) % COLORS.length]; byColor.has(c) ? byColor.get(c).push(p.mesh) : byColor.set(c, [p.mesh]); });
+  viewer.show([...byColor].map(([color, ms]) => ({ mesh: mergeMeshes(ms), color })), { keepView: true });
   ["dl3mf", "dlzip", "save"].forEach(b => $(b).disabled = false); busy(false);
+}
+// The cut runs in a worker so the page stays responsive. Copies of the mesh go in, so src is untouched.
+// Falls back to the main thread if this browser can't start a module worker.
+let worker = null;
+function cutInWorker(mesh, opt) {
+  try { worker = worker || new Worker(new URL("./worker.js", import.meta.url), { type: "module" }); }
+  catch { return Promise.resolve(cutPuzzle(mesh, opt)); }
+  return new Promise((resolve, reject) => {
+    worker.onmessage = ({ data }) => {
+      if (data.progress) { const [k, n] = data.progress; $("stats").textContent = `Cutting piece ${k + 1} of ${n}…`; }
+      else if (data.error) reject(new Error(data.error)); else resolve(data.result);
+    };
+    worker.onerror = e => { e.preventDefault(); worker.terminate(); worker = null; try { resolve(cutPuzzle(mesh, opt)); } catch (err) { reject(err); } };
+    worker.postMessage({ mesh: { pos: mesh.pos.slice(), idx: mesh.idx.slice() }, opt });
+  });
 }
 $("cut").onclick = cut;
 $("shuffle").onclick = () => { seed = (seed * 31 + 17) % 100000; cut(); };
